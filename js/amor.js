@@ -8,10 +8,6 @@ const seccionTitulo = document.createElement("section")
 seccionTitulo.className = "titulo"
 header.appendChild(seccionTitulo)
 
-const marca = document.createElement("div")
-marca.className = "marca"
-seccionTitulo.appendChild(marca)
-
 const bloqueTit = document.createElement("div")
 seccionTitulo.appendChild(bloqueTit)
 
@@ -71,8 +67,9 @@ async function cargarMensajes(){
       heroFecha.innerText = ""
     }
 
+    // ✅ historial sin repetir el primero + con fecha
     timeline.innerHTML = ""
-    mensajes.forEach(m => {
+    mensajes.slice(1).forEach(m => {
       const card = document.createElement("article")
       card.className = "msg-card"
 
@@ -80,6 +77,11 @@ async function cargarMensajes(){
       p.className = "msg-texto"
       p.innerText = m.mensaje || ""
       card.appendChild(p)
+
+      const f = document.createElement("p")
+      f.className = "msg-fecha"
+      f.innerText = m.timestamp ? formatearFecha(m.timestamp) : ""
+      card.appendChild(f)
 
       timeline.appendChild(card)
     })
@@ -89,5 +91,6 @@ async function cargarMensajes(){
     heroFecha.innerText = ""
   }
 }
+
 
 window.addEventListener("load", cargarMensajes)

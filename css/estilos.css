@@ -140,6 +140,13 @@ main{
 }
 
 /* ======= SECCIÓN AGREGAR MENSAJE ======= */
+
+.msg-fecha{
+  margin: 0.25rem 0 0 0;
+  font-size: 0.82rem;
+  color: rgba(43, 27, 34, 0.6);
+}
+
 .agregarMensaje{
   background: var(--card);
   border: 1px solid var(--border);
