@@ -1,5 +1,5 @@
 // ================== CONFIG ==================
-const API_URL = "PON_AQUI_TU_URL_DEL_APPS_SCRIPT"
+const API_URL = "https://script.google.com/macros/s/AKfycbxR533VEsnctfiJ5qmb1H3srZX3LMRT3oWCUsLKaNP5pkXXQ-HU6ufU2AQULk5a3LQM/exec"
 
 // ================== HEADER ==================
 const header = document.querySelector("header")
