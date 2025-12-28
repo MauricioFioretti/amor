@@ -1,5 +1,5 @@
 // ================== CONFIG ==================
-const API_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLgAAVjgc-YV96bTkNKfwn467PrqNb7eP6UaFJDXP_5dxVHd_5OE4rxjcuKErNQLIv9GF80ZiA8rJ_--tjBk59NKW6R_DCMDUBzvmkk-gKe8HfYGXpzGXTTkKW4A_stLt5IPPbiymM44MYoCqp3VIgc1dur9hKGQaxu31nhQC2_rTohGX7cw4_9gCIqqIB0UvPmtFIXynTPytF3XL-ui816z_B31iOu611HQ6hcGasgc4cqaloyXLNTuaRDcux-dLbfnZ9PqQDUtEbODgGr2JViO7uOiMA&lib=M4JruGeuSbuyEj-RXPzQaUaaZ4aZnzWxY"
+const API_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLg5BCWRDxHj39nKbSdLQpxgXe3v1jkfpB1y2LvhfTWnz0FsLSVJSUP75vom3aE-c7DMhHF7Ej1hdynpx69lkr4cjpQVjVygUji36ofWkNhH-90QTA6CzBl5yU--gXoEZDl-NwSydMAVs_tDlMxtALrn54ATbLqmE6qZ7GkXc6lWH82BrD58L-DgFOmS3SfqgI3RPYdwbrCIm1OrizM9jWgBzhho5nwONyQOcNO8r6s0KGRKj_kFgvgyV4J_utyOfBme04Y0JwYYLMfuAPwJ8jFROzfLAA&lib=M4JruGeuSbuyEj-RXPzQaUaaZ4aZnzWxY"
 
 // ================== HEADER ==================
 const header = document.querySelector("header")
@@ -16,43 +16,29 @@ const bloqueTit = document.createElement("div")
 seccionTitulo.appendChild(bloqueTit)
 
 const h1 = document.createElement("h1")
-h1.innerText = "Cartitas para vos"
+h1.innerText = "Mensajitos"
 bloqueTit.appendChild(h1)
 
 const sub = document.createElement("p")
 sub.className = "sub"
-sub.innerText = "Un pedacito de lo que siento, guardado para siempre 💗"
+sub.innerText = "💗"
 bloqueTit.appendChild(sub)
 
 // ================== MAIN ==================
 const main = document.querySelector("main")
 
-// HERO
+// HERO (solo mensajito + fecha)
 const hero = document.createElement("section")
 hero.className = "hero"
 main.appendChild(hero)
 
-const heroTop = document.createElement("div")
-heroTop.className = "hero-top"
-hero.appendChild(heroTop)
-
-const badge = document.createElement("span")
-badge.className = "badge"
-badge.innerText = "Último mensaje"
-heroTop.appendChild(badge)
-
-const heroTitle = document.createElement("h2")
-heroTitle.innerText = "Cargando..."
-heroTop.appendChild(heroTitle)
-
 const heroMensaje = document.createElement("p")
 heroMensaje.className = "hero-mensaje"
-heroMensaje.innerText = ""
+heroMensaje.innerText = "Cargando..."
 hero.appendChild(heroMensaje)
 
 const heroFecha = document.createElement("p")
 heroFecha.className = "hero-fecha"
-heroFecha.innerText = ""
 hero.appendChild(heroFecha)
 
 // Timeline
@@ -75,49 +61,32 @@ async function cargarMensajes(){
     const resp = await fetch(API_URL)
     const mensajes = await resp.json()
 
-    mensajes.sort((a,b) => {
-      const ta = new Date(a.timestamp).getTime() || 0
-      const tb = new Date(b.timestamp).getTime() || 0
-      return tb - ta
-    })
+    mensajes.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))
 
-    if(mensajes.length > 0){
-      const ultimo = mensajes[0]
-      heroTitle.innerText = ultimo.titulo || "Mensaje"
-      heroMensaje.innerText = ultimo.mensaje || ""
-      heroFecha.innerText = ultimo.timestamp ? formatearFecha(ultimo.timestamp) : ""
+    if(mensajes.length){
+      heroMensaje.innerText = mensajes[0].mensaje || ""
+      heroFecha.innerText = formatearFecha(mensajes[0].timestamp)
     }else{
-      heroTitle.innerText = "Todavía no hay mensajes…"
-      heroMensaje.innerText = "Pronto vas a tener el primero ✨"
+      heroMensaje.innerText = "Todavía no hay mensajitos ✨"
       heroFecha.innerText = ""
     }
 
     timeline.innerHTML = ""
-    mensajes.forEach((m) => {
+    mensajes.forEach(m => {
       const card = document.createElement("article")
       card.className = "msg-card"
-
-      const h3 = document.createElement("h3")
-      h3.innerText = m.titulo || "Mensaje"
-      card.appendChild(h3)
 
       const p = document.createElement("p")
       p.className = "msg-texto"
       p.innerText = m.mensaje || ""
       card.appendChild(p)
 
-      const f = document.createElement("p")
-      f.className = "msg-fecha"
-      f.innerText = m.timestamp ? formatearFecha(m.timestamp) : ""
-      card.appendChild(f)
-
       timeline.appendChild(card)
     })
-
   }catch(err){
-    console.error("Error al cargar mensajes:", err)
-    heroTitle.innerText = "No pude cargar los mensajes 😕"
-    heroMensaje.innerText = "Revisá que la URL del Apps Script esté bien publicada."
+    console.error(err)
+    heroMensaje.innerText = "No pude cargar los mensajitos 😕"
+    heroFecha.innerText = ""
   }
 }
 
