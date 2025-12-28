@@ -1,0 +1,272 @@
+/* ======= BASE ======= */
+:root{
+  --bg-1: #fff5f8;
+  --bg-2: #ffe7ef;
+  --card: rgba(255, 255, 255, 0.72);
+  --card-2: rgba(255, 255, 255, 0.55);
+  --border: rgba(255, 105, 180, 0.18);
+  --text: #2b1b22;
+  --muted: rgba(43, 27, 34, 0.65);
+  --accent: #ff4d7d;
+  --accent-2: #ff7aa2;
+  --btn: #ff4d7d;
+  --btn-hover: #ff2f67;
+  --shadow: 0 18px 50px rgba(255, 77, 125, 0.12);
+}
+
+*{ box-sizing: border-box; }
+
+body{
+  margin: 0;
+  padding: 1.4rem;
+  min-height: 100vh;
+  color: var(--text);
+  font-family: "Montserrat", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  background:
+    radial-gradient(circle at 10% 10%, #ffffff 0 20%, transparent 21%),
+    radial-gradient(circle at 90% 20%, #ffffff 0 14%, transparent 15%),
+    radial-gradient(circle at 20% 90%, #ffffff 0 16%, transparent 17%),
+    linear-gradient(135deg, var(--bg-1), var(--bg-2));
+}
+
+/* decor sutil de corazones */
+body::before{
+  content:"";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.22;
+  background-image:
+    radial-gradient(circle at 15% 25%, rgba(255,77,125,0.25) 0 2px, transparent 3px),
+    radial-gradient(circle at 65% 35%, rgba(255,77,125,0.20) 0 2px, transparent 3px),
+    radial-gradient(circle at 85% 75%, rgba(255,77,125,0.18) 0 2px, transparent 3px),
+    radial-gradient(circle at 35% 70%, rgba(255,77,125,0.14) 0 2px, transparent 3px);
+  filter: blur(0.2px);
+}
+
+main{
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+/* ======= HEADER / TÍTULO ======= */
+.titulo{
+  display: flex;
+  align-items: baseline;
+  gap: .8rem;
+  margin: 0.2rem auto 1.2rem auto;
+  max-width: 860px;
+}
+
+.titulo .marca{
+  width: 12px;
+  height: 44px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, var(--accent), #ffd1dc);
+  box-shadow: 0 0 18px rgba(255, 77, 125, 0.35);
+}
+
+.titulo h1{
+  margin: 0;
+  font-family: "Great Vibes", cursive;
+  font-size: 3rem;
+  font-weight: 400;
+  color: #3b1c28;
+  letter-spacing: 0.02em;
+}
+
+.titulo .sub{
+  margin: 0 0 0.2rem 0;
+  font-size: .95rem;
+  color: var(--muted);
+}
+
+/* ======= HERO MENSAJE DESTACADO ======= */
+.hero{
+  background: linear-gradient(135deg, rgba(255,255,255,0.82), rgba(255,255,255,0.55));
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 1.1rem 1.2rem;
+  margin-bottom: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero::after{
+  content:"";
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  right: -90px;
+  top: -90px;
+  background: radial-gradient(circle, rgba(255,77,125,0.18), transparent 60%);
+}
+
+.hero-top{
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: .6rem;
+}
+
+.badge{
+  font-size: .78rem;
+  padding: .25rem .55rem;
+  border-radius: 999px;
+  background: rgba(255,77,125,0.12);
+  border: 1px solid rgba(255,77,125,0.16);
+  color: #7a2b44;
+}
+
+.hero h2{
+  margin: 0;
+  font-size: 1.05rem;
+  color: rgba(43,27,34,0.86);
+  font-weight: 700;
+}
+
+.hero-mensaje{
+  margin: 0.2rem 0 0.55rem 0;
+  font-size: 1.05rem;
+  line-height: 1.55;
+}
+
+.hero-fecha{
+  margin: 0;
+  font-size: .85rem;
+  color: var(--muted);
+}
+
+/* ======= SECCIÓN AGREGAR MENSAJE ======= */
+.agregarMensaje{
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 1rem 1.1rem;
+  box-shadow: 0 12px 40px rgba(255,77,125,0.08);
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  margin-bottom: 1rem;
+}
+
+.agregarMensaje label{
+  font-size: .92rem;
+  color: rgba(43,27,34,0.88);
+  font-weight: 600;
+}
+
+.agregarMensaje input,
+.agregarMensaje textarea{
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(255,77,125,0.18);
+  background: rgba(255,255,255,0.7);
+  padding: .65rem .75rem;
+  font-size: .98rem;
+  color: var(--text);
+  outline: none;
+}
+
+.agregarMensaje textarea{
+  min-height: 110px;
+  resize: vertical;
+}
+
+.fila-botones{
+  display: flex;
+  gap: .6rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+/* ======= BOTONES ======= */
+button{
+  background: var(--btn);
+  color: #fff;
+  border: none;
+  border-radius: 999px;
+  padding: .62rem 1.05rem;
+  cursor: pointer;
+  font-size: .92rem;
+  font-weight: 700;
+  transition: transform .12s ease, background .15s ease, box-shadow .15s ease;
+  box-shadow: 0 10px 26px rgba(255,77,125,0.25);
+}
+
+button:hover{
+  background: var(--btn-hover);
+  transform: translateY(-1px);
+}
+
+button:active{
+  transform: translateY(0px) scale(0.99);
+}
+
+.secundario{
+  background: rgba(255,77,125,0.12);
+  color: #7a2b44;
+  box-shadow: none;
+  border: 1px solid rgba(255,77,125,0.18);
+}
+
+.secundario:hover{
+  background: rgba(255,77,125,0.18);
+}
+
+/* ======= HISTORIAL / TIMELINE ======= */
+.timeline{
+  display: flex;
+  flex-direction: column;
+  gap: .75rem;
+  margin-bottom: 1.5rem;
+}
+
+.msg-card{
+  background: var(--card-2);
+  border: 1px solid rgba(255,77,125,0.14);
+  border-radius: 18px;
+  padding: .95rem 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.msg-card::before{
+  content:"";
+  position: absolute;
+  left: 14px;
+  top: 16px;
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255,77,125,0.55);
+  box-shadow: 0 0 12px rgba(255,77,125,0.22);
+}
+
+.msg-card h3{
+  margin: 0 0 .45rem 0;
+  padding-left: 16px;
+  font-size: 1rem;
+  color: rgba(43,27,34,0.90);
+}
+
+.msg-texto{
+  margin: 0 0 .45rem 0;
+  padding-left: 16px;
+  line-height: 1.55;
+}
+
+.msg-fecha{
+  margin: 0;
+  padding-left: 16px;
+  font-size: .82rem;
+  color: var(--muted);
+}
+
+/* ====== RESPONSIVO ====== */
+@media (max-width: 600px){
+  body{ padding: 1rem; }
+  .titulo h1{ font-size: 2.4rem; }
+}
