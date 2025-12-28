@@ -1,5 +1,5 @@
 // ================== CONFIG ==================
-const API_URL = "https://script.google.com/macros/s/AKfycbxR533VEsnctfiJ5qmb1H3srZX3LMRT3oWCUsLKaNP5pkXXQ-HU6ufU2AQULk5a3LQM/exec"
+const API_URL = "https://script.googleusercontent.com/macros/echo?user_content_key=AehSKLgAAVjgc-YV96bTkNKfwn467PrqNb7eP6UaFJDXP_5dxVHd_5OE4rxjcuKErNQLIv9GF80ZiA8rJ_--tjBk59NKW6R_DCMDUBzvmkk-gKe8HfYGXpzGXTTkKW4A_stLt5IPPbiymM44MYoCqp3VIgc1dur9hKGQaxu31nhQC2_rTohGX7cw4_9gCIqqIB0UvPmtFIXynTPytF3XL-ui816z_B31iOu611HQ6hcGasgc4cqaloyXLNTuaRDcux-dLbfnZ9PqQDUtEbODgGr2JViO7uOiMA&lib=M4JruGeuSbuyEj-RXPzQaUaaZ4aZnzWxY"
 
 // ================== HEADER ==================
 const header = document.querySelector("header")
