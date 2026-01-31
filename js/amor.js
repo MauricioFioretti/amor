@@ -75,6 +75,9 @@ btnRecargar.className = "secundario";
 btnRecargar.innerText = "Recargar";
 acciones.appendChild(btnRecargar);
 
+// DEBUG: botón para expirar token a propósito (REMOVIDO de la UI)
+// Si querés probar expiración, usá en consola: forceExpireToken();
+
 // Ocultos por defecto: se muestran si hace falta login o si querés recargar manualmente
 btnLogin.style.display = "none";
 btnRecargar.style.display = "none";
@@ -114,6 +117,20 @@ function loadStoredOAuthEmail() {
 }
 function saveStoredOAuthEmail(email) {
   try { localStorage.setItem(LS_OAUTH_EMAIL, (email || "").toString()); } catch {}
+}
+// ===== DEBUG: Expirar token para probar reconexión =====
+function forceExpireToken() {
+  // Expira en memoria
+  oauthAccessToken = "";
+  oauthExpiresAt = 0;
+
+  // Expira en storage
+  clearStoredOAuth();
+
+  // (opcional) también podés limpiar el hint si querés testear “sin ayuda”:
+  // localStorage.removeItem(LS_OAUTH_EMAIL);
+
+  console.warn("[DEBUG] Token expirado localmente. Próximo request debería pedir token de nuevo.");
 }
 
 let tokenClient = null;

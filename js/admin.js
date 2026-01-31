@@ -55,6 +55,18 @@ function saveStoredOAuthEmail(email) {
   try { localStorage.setItem(LS_OAUTH_EMAIL, (email || "").toString()); } catch {}
 }
 
+// ===== DEBUG: Expirar token para probar reconexión =====
+function forceExpireToken() {
+  oauthAccessToken = "";
+  oauthExpiresAt = 0;
+  clearStoredOAuth();
+
+  // opcional: limpiar hint
+  // localStorage.removeItem(LS_OAUTH_EMAIL);
+
+  console.warn("[DEBUG] Token expirado localmente. Próximo request debería pedir token de nuevo.");
+}
+
 let tokenClient = null;
 let oauthAccessToken = "";
 let oauthExpiresAt = 0;
