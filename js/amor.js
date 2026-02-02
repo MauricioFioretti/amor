@@ -1,6 +1,7 @@
-// ================== CONFIG (BACKEND WEB APP) ==================
-// ⚠️ Pegá acá TU /exec del Apps Script NUEVO (OAuth Protected)
-const API_BASE = "https://script.google.com/macros/s/AKfycbxR533VEsnctfiJ5qmb1H3srZX3LMRT3oWCUsLKaNP5pkXXQ-HU6ufU2AQULk5a3LQM/exec";
+// ================== CONFIG (DIRECT GOOGLE SHEETS API) ==================
+// ✅ Directo a Google Sheets API (como tu página de comidas) => más rápido
+const SPREADSHEET_ID = "1fWVZRExk6cnMK3fLHnM3S1pLc0TWk0pJ2dkUFoO0ZcU";
+const SHEET_NAME = "Sheet1"; // pestaña/hoja
 
 // ================== CONFIG OAUTH (GIS) ==================
 const OAUTH_CLIENT_ID = "914190895179-uo7rd9mevu7hn0cdlkmqdppk4cqqn05a.apps.googleusercontent.com";
@@ -84,11 +85,86 @@ btnRecargar.style.display = "none";
 
 // ================== HELPERS ==================
 function formatearFecha(ts) {
+  // Soporta:
+  // - ISO: "2026-02-01T12:34:56.000Z"
+  // - Fecha local: "31/01/2026 10:30" o "31-01-2026 10:30"
+  // - Serial de Sheets (número): 45567.5 (días desde 1899-12-30)
   try {
-    const d = new Date(ts);
-    return d.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+    if (ts === null || ts === undefined) return "";
+    const raw = (typeof ts === "string") ? ts.trim() : ts;
+
+    // 1) Si viene como número (serial Sheets) o string numérico
+    const n = (typeof raw === "number") ? raw : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+    if (!Number.isNaN(n) && Number.isFinite(n)) {
+      // Google Sheets serial date: days since 1899-12-30
+      const ms = Math.round((n - 25569) * 86400 * 1000); // 25569 = días entre 1899-12-30 y 1970-01-01
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      }
+    }
+
+    // 2) Intento parse directo (ISO suele funcionar)
+    const d1 = new Date(raw);
+    if (!isNaN(d1.getTime())) {
+      return d1.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    // 3) Parse dd/mm/yyyy (o dd-mm-yyyy) con hora opcional
+    const m = String(raw).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = Number(m[3]);
+      const hh = Number(m[4] || 0);
+      const mi = Number(m[5] || 0);
+      const ss = Number(m[6] || 0);
+      const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
+      if (!isNaN(d2.getTime())) {
+        return d2.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      }
+    }
+
+    return "";
   } catch {
     return "";
+  }
+}
+
+function timestampToMs(ts) {
+  // Devuelve milisegundos desde Epoch (Number) o 0 si no se puede parsear.
+  try {
+    if (ts === null || ts === undefined) return 0;
+
+    // Si ya viene como número (serial Sheets) o string numérico
+    const raw = (typeof ts === "string") ? ts.trim() : ts;
+    const n = (typeof raw === "number") ? raw : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+
+    if (!Number.isNaN(n) && Number.isFinite(n)) {
+      // Google Sheets serial date: days since 1899-12-30
+      return Math.round((n - 25569) * 86400 * 1000);
+    }
+
+    // ISO u otros formatos que JS entienda
+    const d1 = new Date(raw);
+    if (!isNaN(d1.getTime())) return d1.getTime();
+
+    // dd/mm/yyyy (o dd-mm-yyyy) con hora opcional
+    const m = String(raw).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = Number(m[3]);
+      const hh = Number(m[4] || 0);
+      const mi = Number(m[5] || 0);
+      const ss = Number(m[6] || 0);
+      const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
+      if (!isNaN(d2.getTime())) return d2.getTime();
+    }
+
+    return 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -252,35 +328,76 @@ async function fetchUserEmailFromToken(accessToken) {
 }
 
 // ================== API (POST text/plain) ==================
+// ================== API (DIRECT GOOGLE SHEETS API) ==================
 async function apiPost_(payload) {
-  let r, text;
+  // payload esperado: { mode, access_token, mensaje? }
+  const mode = (payload?.mode || "").toString().toLowerCase();
+  const token = (payload?.access_token || "").toString();
+  if (!token) return { ok: false, error: "auth_required" };
+
+  const sheetEsc = encodeURIComponent(SHEET_NAME);
 
   try {
-    r = await fetch(API_BASE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload || {}),
-      cache: "no-store",
-      redirect: "follow"
-    });
+    // ---------- GET (leer mensajes) ----------
+    // Lee A (mensaje) y B (timestamp) desde A2:B
+    if (mode === "get") {
+      const url =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
+        `/values/${sheetEsc}!A2:B?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
+
+      const r = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store"
+      });
+
+      const txt = await r.text();
+      if (!r.ok) return { ok: false, error: "get_failed", detail: txt.slice(0, 800) };
+
+      const json = JSON.parse(txt);
+      const values = Array.isArray(json?.values) ? json.values : [];
+
+      // Convertimos a tu formato actual {mensaje, timestamp}
+      const mensajes = values
+        .filter(row => (row?.[0] || "").toString().trim() !== "")
+        .map(row => ({
+          mensaje: (row?.[0] || "").toString(),
+          timestamp: (row?.[1] ?? "")
+        }));
+
+      return { ok: true, mensajes };
+    }
+
+    // ---------- ADD (agregar mensaje) ----------
+    if (mode === "add") {
+      const mensaje = (payload?.mensaje || "").toString().trim();
+      if (!mensaje) return { ok: false, error: "invalid_data" };
+
+      const url =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
+        `/values/${sheetEsc}!A:B:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+
+      const body = {
+        values: [[mensaje, new Date().toISOString()]]
+      };
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      const txt = await r.text();
+      if (!r.ok) return { ok: false, error: "add_failed", detail: txt.slice(0, 800) };
+
+      return { ok: true };
+    }
+
+    return { ok: false, error: "bad_mode" };
   } catch (e) {
     return { ok: false, error: "network_error", detail: String(e?.message || e) };
-  }
-
-  try {
-    text = await r.text();
-  } catch (e) {
-    return { ok: false, error: "read_error", status: r.status, detail: String(e?.message || e) };
-  }
-
-  if (!r.ok) {
-    return { ok: false, error: "http_error", status: r.status, detail: (text || "").slice(0, 800) };
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { ok: false, error: "non_json", status: r.status, detail: (text || "").slice(0, 800) };
   }
 }
 
@@ -288,22 +405,26 @@ async function apiCall(mode, payload = {}, opts = {}) {
   const allowInteractive = !!opts.allowInteractive;
 
   // asegurar token
-  const token = await ensureOAuthToken(allowInteractive, opts.interactivePrompt || "consent");
+  let token = await ensureOAuthToken(allowInteractive, opts.interactivePrompt || "consent");
 
-  // opcional: guardar email hint (ayuda silent)
-  try {
-    const email = await fetchUserEmailFromToken(token);
-    if (email) saveStoredOAuthEmail(email);
-  } catch {}
+  // IMPORTANTE: NO llamamos userinfo acá (es un request extra y enlentece)
+  // Si querés guardar hintEmail, lo hacemos SOLO si todavía no existe:
+  const hintEmail = (loadStoredOAuthEmail() || "").trim().toLowerCase();
+  if (!hintEmail) {
+    try {
+      const email = await fetchUserEmailFromToken(token);
+      if (email) saveStoredOAuthEmail(email);
+    } catch {}
+  }
 
   const body = { mode, access_token: token, ...(payload || {}) };
 
   let data = await apiPost_(body);
 
   // retry interactivo si auth/scope falló
-  if (!data?.ok && (data?.error === "missing_scope" || data?.error === "auth_required" || data?.error === "wrong_audience")) {
-    const token2 = await ensureOAuthToken(true, "consent");
-    body.access_token = token2;
+  if (!data?.ok && (data?.error === "missing_scope" || data?.error === "auth_required")) {
+    token = await ensureOAuthToken(true, "consent");
+    body.access_token = token;
     data = await apiPost_(body);
   }
 
@@ -319,7 +440,7 @@ async function cargarMensajes({ allowInteractive } = { allowInteractive: false }
 
     const mensajes = Array.isArray(resp?.mensajes) ? resp.mensajes : [];
 
-    mensajes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    mensajes.sort((a, b) => timestampToMs(b.timestamp) - timestampToMs(a.timestamp));
 
     if (mensajes.length) {
       heroMensaje.innerText = mensajes[0].mensaje || "";
@@ -367,8 +488,8 @@ async function cargarMensajes({ allowInteractive } = { allowInteractive: false }
     heroMensaje.innerText = "No pude cargar los mensajitos 😕";
     heroFecha.innerText = "";
 
-    // por si falló por otra cosa, dejá recargar visible
-    btnLogin.style.display = "none";
+    // ✅ si hubo cualquier problema, dejá SIEMPRE una forma de reconectar
+    btnLogin.style.display = "inline-block";
     btnRecargar.style.display = "inline-block";
   }
 }
@@ -403,14 +524,40 @@ window.addEventListener("load", async () => {
   // intento silencioso primero
   await cargarMensajes({ allowInteractive: false });
 
-    // BOTONES
-  btnLogin.addEventListener("click", async () => {
-    if (isTokenValid()) return;
-    await cargarMensajes({ allowInteractive: true });
+  // BOTONES
+  btnLogin.addEventListener("click", () => {
+    // IMPORTANTE: abrir popup DIRECTO dentro del click (evita bloqueos en Safari/iOS)
+    try {
+      const hintEmail = (loadStoredOAuthEmail() || "").trim().toLowerCase();
+
+      requestAccessToken({
+        prompt: "select_account",
+        hint: hintEmail || undefined
+      })
+        .then(async () => {
+          // Ya guardó token en oauthAccessToken/oauthExpiresAt por requestAccessToken()
+          // Intentamos cargar (sin forzar popup de nuevo)
+          await cargarMensajes({ allowInteractive: false });
+        })
+        .catch((e) => {
+          console.warn("Login cancelado o falló:", e);
+          // Dejá los botones visibles para reintentar
+          btnLogin.style.display = "inline-block";
+          btnRecargar.style.display = "inline-block";
+        });
+    } catch (e) {
+      console.warn("No se pudo iniciar login:", e);
+      btnLogin.style.display = "inline-block";
+      btnRecargar.style.display = "inline-block";
+    }
   });
 
   btnRecargar.addEventListener("click", async () => {
-    await cargarMensajes({ allowInteractive: true });
+    // 1) primero intento rápido sin popup
+    await cargarMensajes({ allowInteractive: false });
+
+    // 2) si sigue pidiendo login, el usuario usa "Iniciar sesión"
+    // (No forzamos popup acá para no molestar)
   });
 
   // Click en el hero también sirve, pero ahora hay botones visibles

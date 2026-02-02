@@ -1,6 +1,6 @@
-// ================== CONFIG (BACKEND WEB APP) ==================
-// ⚠️ Pegá acá TU /exec del Apps Script NUEVO (OAuth Protected)
-const API_BASE = "https://script.google.com/macros/s/AKfycbxR533VEsnctfiJ5qmb1H3srZX3LMRT3oWCUsLKaNP5pkXXQ-HU6ufU2AQULk5a3LQM/exec";
+// ================== CONFIG (DIRECT GOOGLE SHEETS API) ==================
+const SPREADSHEET_ID = "1fWVZRExk6cnMK3fLHnM3S1pLc0TWk0pJ2dkUFoO0ZcU";
+const SHEET_NAME = "Sheet1";
 
 // ================== CONFIG OAUTH (GIS) ==================
 const OAUTH_CLIENT_ID = "914190895179-uo7rd9mevu7hn0cdlkmqdppk4cqqn05a.apps.googleusercontent.com";
@@ -21,10 +21,80 @@ const LS_OAUTH_EMAIL = "amor_admin_oauth_email_v1";  // email para hint
 // ================== HELPERS ==================
 function formatearFecha(ts) {
   try {
-    const d = new Date(ts);
-    return d.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+    if (ts === null || ts === undefined) return "";
+    const raw = (typeof ts === "string") ? ts.trim() : ts;
+
+    const n = (typeof raw === "number") ? raw : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+    if (!Number.isNaN(n) && Number.isFinite(n)) {
+      const ms = Math.round((n - 25569) * 86400 * 1000);
+      const d = new Date(ms);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      }
+    }
+
+    const d1 = new Date(raw);
+    if (!isNaN(d1.getTime())) {
+      return d1.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+    }
+
+    const m = String(raw).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = Number(m[3]);
+      const hh = Number(m[4] || 0);
+      const mi = Number(m[5] || 0);
+      const ss = Number(m[6] || 0);
+      const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
+      if (!isNaN(d2.getTime())) {
+        return d2.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      }
+    }
+
+    return "";
   } catch {
     return "";
+  }
+}
+
+function timestampToMs(ts) {
+  // Devuelve milisegundos desde Epoch (Number) o 0 si no se puede parsear.
+  try {
+    if (ts === null || ts === undefined) return 0;
+
+    const raw = (typeof ts === "string") ? ts.trim() : ts;
+
+    // 1) Número (serial Sheets) o string numérico
+    const n = (typeof raw === "number")
+      ? raw
+      : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+
+    if (!Number.isNaN(n) && Number.isFinite(n)) {
+      // Sheets serial: days since 1899-12-30
+      return Math.round((n - 25569) * 86400 * 1000);
+    }
+
+    // 2) ISO u otro formato parseable por Date()
+    const d1 = new Date(raw);
+    if (!isNaN(d1.getTime())) return d1.getTime();
+
+    // 3) dd/mm/yyyy (o dd-mm-yyyy) con hora opcional
+    const m = String(raw).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
+    if (m) {
+      const dd = Number(m[1]);
+      const mm = Number(m[2]);
+      const yyyy = Number(m[3]);
+      const hh = Number(m[4] || 0);
+      const mi = Number(m[5] || 0);
+      const ss = Number(m[6] || 0);
+      const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
+      if (!isNaN(d2.getTime())) return d2.getTime();
+    }
+
+    return 0;
+  } catch {
+    return 0;
   }
 }
 
@@ -181,56 +251,93 @@ async function fetchUserEmailFromToken(accessToken) {
 }
 
 // ================== API (POST text/plain) ==================
+// ================== API (DIRECT GOOGLE SHEETS API) ==================
 async function apiPost_(payload) {
-  let r, text;
+  const mode = (payload?.mode || "").toString().toLowerCase();
+  const token = (payload?.access_token || "").toString();
+  if (!token) return { ok: false, error: "auth_required" };
+
+  const sheetEsc = encodeURIComponent(SHEET_NAME);
 
   try {
-    r = await fetch(API_BASE, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(payload || {}),
-      cache: "no-store",
-      redirect: "follow"
-    });
+    if (mode === "get") {
+      const url =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
+        `/values/${sheetEsc}!A2:B?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
+
+      const r = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store"
+      });
+
+      const txt = await r.text();
+      if (!r.ok) return { ok: false, error: "get_failed", detail: txt.slice(0, 800) };
+
+      const json = JSON.parse(txt);
+      const values = Array.isArray(json?.values) ? json.values : [];
+
+      const mensajes = values
+        .filter(row => (row?.[0] || "").toString().trim() !== "")
+        .map(row => ({
+          mensaje: (row?.[0] || "").toString(),
+          timestamp: (row?.[1] ?? "")
+        }));
+
+      return { ok: true, mensajes };
+    }
+
+    if (mode === "add") {
+      const mensaje = (payload?.mensaje || "").toString().trim();
+      if (!mensaje) return { ok: false, error: "invalid_data" };
+
+      const url =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
+        `/values/${sheetEsc}!A:B:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+
+      const body = { values: [[mensaje, new Date().toISOString()]] };
+
+      const r = await fetch(url, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(body)
+      });
+
+      const txt = await r.text();
+      if (!r.ok) return { ok: false, error: "add_failed", detail: txt.slice(0, 800) };
+
+      return { ok: true };
+    }
+
+    return { ok: false, error: "bad_mode" };
   } catch (e) {
     return { ok: false, error: "network_error", detail: String(e?.message || e) };
-  }
-
-  try {
-    text = await r.text();
-  } catch (e) {
-    return { ok: false, error: "read_error", status: r.status, detail: String(e?.message || e) };
-  }
-
-  if (!r.ok) {
-    return { ok: false, error: "http_error", status: r.status, detail: (text || "").slice(0, 800) };
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { ok: false, error: "non_json", status: r.status, detail: (text || "").slice(0, 800) };
   }
 }
 
 async function apiCall(mode, payload = {}, opts = {}) {
   const allowInteractive = !!opts.allowInteractive;
 
-  const token = await ensureOAuthToken(allowInteractive, opts.interactivePrompt || "consent");
+  let token = await ensureOAuthToken(allowInteractive, opts.interactivePrompt || "consent");
 
-  // guardar email hint
-  try {
-    const email = await fetchUserEmailFromToken(token);
-    if (email) saveStoredOAuthEmail(email);
-  } catch {}
+  // Guardar hintEmail SOLO si falta (evita request extra)
+  const hintEmail = (loadStoredOAuthEmail() || "").trim().toLowerCase();
+  if (!hintEmail) {
+    try {
+      const email = await fetchUserEmailFromToken(token);
+      if (email) saveStoredOAuthEmail(email);
+    } catch {}
+  }
 
   const body = { mode, access_token: token, ...(payload || {}) };
 
   let data = await apiPost_(body);
 
-  if (!data?.ok && (data?.error === "missing_scope" || data?.error === "auth_required" || data?.error === "wrong_audience")) {
-    const token2 = await ensureOAuthToken(true, "consent");
-    body.access_token = token2;
+  if (!data?.ok && (data?.error === "missing_scope" || data?.error === "auth_required")) {
+    token = await ensureOAuthToken(true, "consent");
+    body.access_token = token;
     data = await apiPost_(body);
   }
 
@@ -313,7 +420,7 @@ function init() {
   main.appendChild(timeline);
 
   async function renderMensajes(mensajes) {
-    mensajes.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    mensajes.sort((a, b) => timestampToMs(b.timestamp) - timestampToMs(a.timestamp));
 
     if (mensajes.length) {
       heroMensaje.innerText = mensajes[0].mensaje || "";
