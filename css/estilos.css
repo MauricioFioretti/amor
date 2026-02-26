@@ -114,6 +114,7 @@ main{
   right: -90px;
   top: -90px;
   background: radial-gradient(circle, rgba(255,77,125,0.18), transparent 60%);
+  pointer-events: none; /* <- clave: no tapa clicks */
 }
 
 .hero-top{
@@ -303,6 +304,8 @@ button:active{
   gap:12px;
   align-items:flex-start;
   justify-content:space-between;
+  position: relative;
+  z-index: 2;
 }
 
 .msg-toprow{
