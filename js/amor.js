@@ -589,8 +589,6 @@ async function cargarMensajes({ allowInteractive } = { allowInteractive: false }
         likeBtn.innerText = next ? "♥" : "♡";
         likeBtn.classList.toggle("liked", next);
 
-        console.warn("[LIKE] rowNumber:", rowNumber, "next:", next, "token_valid:", isTokenValid());
-        
         const resp = await apiCall("like", { rowNumber, liked: next }, { allowInteractive: true });
         if (!resp?.ok) {
           // Revertir si falló
