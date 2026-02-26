@@ -195,6 +195,27 @@ function saveStoredOAuth(access_token, expires_at) {
 function clearStoredOAuth() {
   try { localStorage.removeItem(LS_OAUTH); } catch {}
 }
+
+function hardResetOAuth() {
+  oauthAccessToken = "";
+  oauthExpiresAt = 0;
+  clearStoredOAuth();
+}
+
+function isForbiddenOrInsufficientScope(resp) {
+  const d = (resp?.detail || "").toString().toLowerCase();
+  // mensajes típicos de Google cuando el token no tiene scope o no tiene permiso
+  return (
+    d.includes('"code": 403') ||
+    d.includes("403") ||
+    d.includes("forbidden") ||
+    d.includes("permission") ||
+    d.includes("insufficient") ||
+    d.includes("authentication scopes") ||
+    d.includes("request had insufficient authentication scopes")
+  );
+}
+
 function loadStoredOAuthEmail() {
   try {
     return String(localStorage.getItem(LS_OAUTH_EMAIL) || "").trim().toLowerCase();
@@ -399,7 +420,7 @@ async function apiPost_(payload) {
 
       const url =
         `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
-        `/values/${sheetEsc}!A:B:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
+        `/values/${sheetEsc}!A:D:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
       const body = {
         values: [[mensaje, new Date().toISOString(), "false", ""]]
@@ -463,8 +484,7 @@ async function apiCall(mode, payload = {}, opts = {}) {
   // asegurar token
   let token = await ensureOAuthToken(allowInteractive, opts.interactivePrompt || "consent");
 
-  // IMPORTANTE: NO llamamos userinfo acá (es un request extra y enlentece)
-  // Si querés guardar hintEmail, lo hacemos SOLO si todavía no existe:
+  // Guardar hintEmail SOLO si falta (evita request extra)
   const hintEmail = (loadStoredOAuthEmail() || "").trim().toLowerCase();
   if (!hintEmail) {
     try {
@@ -477,10 +497,18 @@ async function apiCall(mode, payload = {}, opts = {}) {
 
   let data = await apiPost_(body);
 
-  // retry interactivo si auth/scope falló
-  if (!data?.ok && (data?.error === "missing_scope" || data?.error === "auth_required")) {
+  // retry interactivo si auth/scope falló (o si Sheets devolvió 403 al escribir)
+  const needsRetry =
+    (!data?.ok && (data?.error === "missing_scope" || data?.error === "auth_required")) ||
+    (!data?.ok && (data?.error === "like_failed" || data?.error === "add_failed") && isForbiddenOrInsufficientScope(data));
+
+  if (needsRetry) {
+    // tiramos token cacheado y forzamos consent
+    hardResetOAuth();
+
     token = await ensureOAuthToken(true, "consent");
     body.access_token = token;
+
     data = await apiPost_(body);
   }
 
@@ -561,6 +589,8 @@ async function cargarMensajes({ allowInteractive } = { allowInteractive: false }
         likeBtn.innerText = next ? "♥" : "♡";
         likeBtn.classList.toggle("liked", next);
 
+        console.warn("[LIKE] rowNumber:", rowNumber, "next:", next, "token_valid:", isTokenValid());
+        
         const resp = await apiCall("like", { rowNumber, liked: next }, { allowInteractive: true });
         if (!resp?.ok) {
           // Revertir si falló
@@ -687,7 +717,9 @@ window.addEventListener("load", async () => {
       heroLikeBtn.dataset.liked = current ? "1" : "0";
       heroLikeBtn.innerText = current ? "♥" : "♡";
       heroLikeBtn.classList.toggle("liked", current);
+
       console.warn("No se pudo guardar like:", resp);
+      if (resp?.detail) console.warn("Detalle Sheets:", resp.detail);
     }
   });
 
