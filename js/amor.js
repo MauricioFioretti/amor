@@ -12,7 +12,7 @@ const OAUTH_SCOPES = [
   "profile",
   "https://www.googleapis.com/auth/userinfo.email",
   "https://www.googleapis.com/auth/userinfo.profile",
-  "https://www.googleapis.com/auth/spreadsheets.readonly"
+  "https://www.googleapis.com/auth/spreadsheets"
 ].join(" ");
 
 // LocalStorage OAuth
@@ -46,10 +46,21 @@ const hero = document.createElement("section");
 hero.className = "hero";
 main.appendChild(hero);
 
+const heroMensajeWrap = document.createElement("div");
+heroMensajeWrap.className = "hero-mensaje-wrap";
+hero.appendChild(heroMensajeWrap);
+
 const heroMensaje = document.createElement("p");
 heroMensaje.className = "hero-mensaje";
 heroMensaje.innerText = "Cargando...";
-hero.appendChild(heroMensaje);
+heroMensajeWrap.appendChild(heroMensaje);
+
+const heroLikeBtn = document.createElement("button");
+heroLikeBtn.type = "button";
+heroLikeBtn.className = "like-btn";
+heroLikeBtn.setAttribute("aria-label", "Marcar como leído");
+heroLikeBtn.innerText = "♡";
+heroMensajeWrap.appendChild(heroLikeBtn);
 
 const heroFecha = document.createElement("p");
 heroFecha.className = "hero-fecha";
@@ -341,9 +352,10 @@ async function apiPost_(payload) {
     // ---------- GET (leer mensajes) ----------
     // Lee A (mensaje) y B (timestamp) desde A2:B
     if (mode === "get") {
+      // Trae A:mensaje, B:timestamp, C:liked, D:liked_at
       const url =
         `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
-        `/values/${sheetEsc}!A2:B?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
+        `/values/${sheetEsc}!A2:D?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
 
       const r = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -356,13 +368,26 @@ async function apiPost_(payload) {
       const json = JSON.parse(txt);
       const values = Array.isArray(json?.values) ? json.values : [];
 
-      // Convertimos a tu formato actual {mensaje, timestamp}
+      // Importante: rowNumber real en sheet = index + 2 (porque arrancamos en A2)
       const mensajes = values
-        .filter(row => (row?.[0] || "").toString().trim() !== "")
-        .map(row => ({
-          mensaje: (row?.[0] || "").toString(),
-          timestamp: (row?.[1] ?? "")
-        }));
+        .map((row, idx) => {
+          const mensaje = (row?.[0] || "").toString();
+          const timestamp = (row?.[1] ?? "");
+          const likedRaw = (row?.[2] ?? "");
+          const likedAt = (row?.[3] ?? "");
+
+          const likedStr = (likedRaw ?? "").toString().trim().toLowerCase();
+          const liked = likedStr === "true" || likedStr === "1" || likedStr === "yes" || likedStr === "si";
+
+          return {
+            rowNumber: idx + 2,
+            mensaje,
+            timestamp,
+            liked,
+            liked_at: likedAt
+          };
+        })
+        .filter(m => (m.mensaje || "").trim() !== "");
 
       return { ok: true, mensajes };
     }
@@ -377,7 +402,7 @@ async function apiPost_(payload) {
         `/values/${sheetEsc}!A:B:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`;
 
       const body = {
-        values: [[mensaje, new Date().toISOString()]]
+        values: [[mensaje, new Date().toISOString(), "false", ""]]
       };
 
       const r = await fetch(url, {
@@ -393,6 +418,37 @@ async function apiPost_(payload) {
       if (!r.ok) return { ok: false, error: "add_failed", detail: txt.slice(0, 800) };
 
       return { ok: true };
+    }
+
+        // ---------- LIKE (marcar leído / me gusta) ----------
+    if (mode === "like") {
+      const rowNumber = Number(payload?.rowNumber || 0);
+      const liked = !!payload?.liked;
+
+      if (!rowNumber || rowNumber < 2) return { ok: false, error: "invalid_row" };
+
+      // Escribe en C (liked) y D (liked_at)
+      const likeRange = `${SHEET_NAME}!C${rowNumber}:D${rowNumber}`;
+      const url =
+        `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
+        `/values/${encodeURIComponent(likeRange)}?valueInputOption=USER_ENTERED`;
+
+      const nowIso = new Date().toISOString();
+      const values = liked ? [["true", nowIso]] : [["false", ""]];
+
+      const r = await fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ values })
+      });
+
+      const txt = await r.text();
+      if (!r.ok) return { ok: false, error: "like_failed", detail: txt.slice(0, 800) };
+
+      return { ok: true, rowNumber, liked, liked_at: liked ? nowIso : "" };
     }
 
     return { ok: false, error: "bad_mode" };
@@ -443,11 +499,26 @@ async function cargarMensajes({ allowInteractive } = { allowInteractive: false }
     mensajes.sort((a, b) => timestampToMs(b.timestamp) - timestampToMs(a.timestamp));
 
     if (mensajes.length) {
-      heroMensaje.innerText = mensajes[0].mensaje || "";
-      heroFecha.innerText = formatearFecha(mensajes[0].timestamp);
+      const top = mensajes[0];
+
+      heroMensaje.innerText = top.mensaje || "";
+      heroFecha.innerText = formatearFecha(top.timestamp);
+
+      // Estado del corazón del hero
+      heroLikeBtn.dataset.rowNumber = String(top.rowNumber || "");
+      heroLikeBtn.dataset.liked = top.liked ? "1" : "0";
+      heroLikeBtn.innerText = top.liked ? "♥" : "♡";
+      heroLikeBtn.classList.toggle("liked", !!top.liked);
+      heroLikeBtn.style.display = "inline-flex";
     } else {
-      heroMensaje.innerText = "Todavía no hay mensajitos ✨";
+      heroMensaje.innerText = "Todavía no hay mensajitos";
       heroFecha.innerText = "";
+
+      heroLikeBtn.dataset.rowNumber = "";
+      heroLikeBtn.dataset.liked = "0";
+      heroLikeBtn.innerText = "♡";
+      heroLikeBtn.classList.remove("liked");
+      heroLikeBtn.style.display = "none";
     }
 
     // si cargó OK, ocultar botón login (ya no hace falta)
@@ -459,10 +530,46 @@ async function cargarMensajes({ allowInteractive } = { allowInteractive: false }
       const card = document.createElement("article");
       card.className = "msg-card";
 
+      const topRow = document.createElement("div");
+      topRow.className = "msg-toprow";
+      card.appendChild(topRow);
+
       const p = document.createElement("p");
       p.className = "msg-texto";
       p.innerText = m.mensaje || "";
-      card.appendChild(p);
+      topRow.appendChild(p);
+
+      const likeBtn = document.createElement("button");
+      likeBtn.type = "button";
+      likeBtn.className = "like-btn";
+      likeBtn.setAttribute("aria-label", "Marcar como leído");
+      likeBtn.dataset.rowNumber = String(m.rowNumber || "");
+      likeBtn.dataset.liked = m.liked ? "1" : "0";
+      likeBtn.innerText = m.liked ? "♥" : "♡";
+      likeBtn.classList.toggle("liked", !!m.liked);
+      topRow.appendChild(likeBtn);
+
+      likeBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+
+        const rowNumber = Number(likeBtn.dataset.rowNumber || 0);
+        const current = likeBtn.dataset.liked === "1";
+        const next = !current;
+
+        // Optimista: actualiza UI antes
+        likeBtn.dataset.liked = next ? "1" : "0";
+        likeBtn.innerText = next ? "♥" : "♡";
+        likeBtn.classList.toggle("liked", next);
+
+        const resp = await apiCall("like", { rowNumber, liked: next }, { allowInteractive: true });
+        if (!resp?.ok) {
+          // Revertir si falló
+          likeBtn.dataset.liked = current ? "1" : "0";
+          likeBtn.innerText = current ? "♥" : "♡";
+          likeBtn.classList.toggle("liked", current);
+          console.warn("No se pudo guardar like:", resp);
+        }
+      });
 
       const f = document.createElement("p");
       f.className = "msg-fecha";
@@ -558,6 +665,30 @@ window.addEventListener("load", async () => {
 
     // 2) si sigue pidiendo login, el usuario usa "Iniciar sesión"
     // (No forzamos popup acá para no molestar)
+  });
+
+    heroLikeBtn.addEventListener("click", async (e) => {
+    e.stopPropagation();
+
+    const rowNumber = Number(heroLikeBtn.dataset.rowNumber || 0);
+    if (!rowNumber) return;
+
+    const current = heroLikeBtn.dataset.liked === "1";
+    const next = !current;
+
+    // UI optimista
+    heroLikeBtn.dataset.liked = next ? "1" : "0";
+    heroLikeBtn.innerText = next ? "♥" : "♡";
+    heroLikeBtn.classList.toggle("liked", next);
+
+    const resp = await apiCall("like", { rowNumber, liked: next }, { allowInteractive: true });
+    if (!resp?.ok) {
+      // revertir
+      heroLikeBtn.dataset.liked = current ? "1" : "0";
+      heroLikeBtn.innerText = current ? "♥" : "♡";
+      heroLikeBtn.classList.toggle("liked", current);
+      console.warn("No se pudo guardar like:", resp);
+    }
   });
 
   // Click en el hero también sirve, pero ahora hay botones visibles

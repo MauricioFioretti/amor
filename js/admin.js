@@ -263,7 +263,7 @@ async function apiPost_(payload) {
     if (mode === "get") {
       const url =
         `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(SPREADSHEET_ID)}` +
-        `/values/${sheetEsc}!A2:B?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
+        `/values/${sheetEsc}!A2:D?majorDimension=ROWS&valueRenderOption=UNFORMATTED_VALUE`;
 
       const r = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
@@ -277,11 +277,24 @@ async function apiPost_(payload) {
       const values = Array.isArray(json?.values) ? json.values : [];
 
       const mensajes = values
-        .filter(row => (row?.[0] || "").toString().trim() !== "")
-        .map(row => ({
-          mensaje: (row?.[0] || "").toString(),
-          timestamp: (row?.[1] ?? "")
-        }));
+        .map((row, idx) => {
+          const mensaje = (row?.[0] || "").toString();
+          const timestamp = (row?.[1] ?? "");
+          const likedRaw = (row?.[2] ?? "");
+          const likedAt = (row?.[3] ?? "");
+
+          const likedStr = (likedRaw ?? "").toString().trim().toLowerCase();
+          const liked = likedStr === "true" || likedStr === "1" || likedStr === "yes" || likedStr === "si";
+
+          return {
+            rowNumber: idx + 2,
+            mensaje,
+            timestamp,
+            liked,
+            liked_at: likedAt
+          };
+        })
+        .filter(m => (m.mensaje || "").trim() !== "");
 
       return { ok: true, mensajes };
     }
@@ -435,15 +448,31 @@ function init() {
       const card = document.createElement("article");
       card.className = "msg-card";
 
+      const topRow = document.createElement("div");
+      topRow.className = "msg-toprow";
+      card.appendChild(topRow);
+
       const p = document.createElement("p");
       p.className = "msg-texto";
       p.innerText = m.mensaje || "";
-      card.appendChild(p);
+      topRow.appendChild(p);
+
+      const likeView = document.createElement("span");
+      likeView.className = "like-view";
+      likeView.innerText = m.liked ? "Leído" : "No leído";
+      topRow.appendChild(likeView);
 
       const f = document.createElement("p");
       f.className = "msg-fecha";
       f.innerText = m.timestamp ? formatearFecha(m.timestamp) : "";
       card.appendChild(f);
+
+      if (m.liked && m.liked_at) {
+        const fa = document.createElement("p");
+        fa.className = "msg-fecha";
+        fa.innerText = "Marcado: " + formatearFecha(m.liked_at);
+        card.appendChild(fa);
+      }
 
       timeline.appendChild(card);
     });

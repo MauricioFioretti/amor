@@ -296,3 +296,48 @@ button:active{
   margin-top:10px;
   justify-content:flex-start;
 }
+
+/* ======= LIKE (corazón) ======= */
+.hero-mensaje-wrap{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  justify-content:space-between;
+}
+
+.msg-toprow{
+  display:flex;
+  gap:12px;
+  align-items:flex-start;
+  justify-content:space-between;
+}
+
+.like-btn{
+  background: rgba(255,77,125,0.10);
+  border: 1px solid rgba(255,77,125,0.18);
+  color: #7a2b44;
+  box-shadow: none;
+  padding: .35rem .65rem;
+  min-width: 44px;
+  justify-content:center;
+  line-height: 1;
+  font-size: 1.1rem;
+}
+
+.like-btn:hover{
+  background: rgba(255,77,125,0.16);
+  transform: translateY(-1px);
+}
+
+.like-btn.liked{
+  background: rgba(255,77,125,0.16);
+  border-color: rgba(255,77,125,0.28);
+}
+
+/* Admin: texto estado */
+.like-view{
+  font-size: .82rem;
+  color: rgba(43,27,34,0.65);
+  padding-top: 2px;
+  white-space: nowrap;
+}
