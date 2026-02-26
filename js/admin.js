@@ -20,24 +20,38 @@ const LS_OAUTH_EMAIL = "amor_admin_oauth_email_v1";  // email para hint
 
 // ================== HELPERS ==================
 function formatearFecha(ts) {
+  // Fix: serial Sheets + salida en 24h (sin AM/PM)
   try {
     if (ts === null || ts === undefined) return "";
     const raw = (typeof ts === "string") ? ts.trim() : ts;
 
-    const n = (typeof raw === "number") ? raw : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+    const fmt = {
+      dateStyle: "medium",
+      timeStyle: "short",
+      hour12: false
+    };
+
+    // 1) Serial de Sheets (número) o string numérico
+    const n = (typeof raw === "number")
+      ? raw
+      : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+
     if (!Number.isNaN(n) && Number.isFinite(n)) {
-      const ms = Math.round((n - 25569) * 86400 * 1000);
-      const d = new Date(ms);
+      const msUtc = Math.round((n - 25569) * 86400 * 1000);
+      const tzFix = new Date(msUtc).getTimezoneOffset() * 60 * 1000;
+      const d = new Date(msUtc + tzFix);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+        return d.toLocaleString("es-AR", fmt);
       }
     }
 
+    // 2) ISO u otros formatos parseables
     const d1 = new Date(raw);
     if (!isNaN(d1.getTime())) {
-      return d1.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      return d1.toLocaleString("es-AR", fmt);
     }
 
+    // 3) dd/mm/yyyy (o dd-mm-yyyy) con hora opcional
     const m = String(raw).match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/);
     if (m) {
       const dd = Number(m[1]);
@@ -48,7 +62,7 @@ function formatearFecha(ts) {
       const ss = Number(m[6] || 0);
       const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
       if (!isNaN(d2.getTime())) {
-        return d2.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+        return d2.toLocaleString("es-AR", fmt);
       }
     }
 
@@ -60,6 +74,7 @@ function formatearFecha(ts) {
 
 function timestampToMs(ts) {
   // Devuelve milisegundos desde Epoch (Number) o 0 si no se puede parsear.
+  // Fix: si viene serial numérico de Sheets, ajustar por zona horaria para que coincida con lo que se ve en Sheets.
   try {
     if (ts === null || ts === undefined) return 0;
 
@@ -71,8 +86,9 @@ function timestampToMs(ts) {
       : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
 
     if (!Number.isNaN(n) && Number.isFinite(n)) {
-      // Sheets serial: days since 1899-12-30
-      return Math.round((n - 25569) * 86400 * 1000);
+      const msUtc = Math.round((n - 25569) * 86400 * 1000);
+      const tzFix = new Date(msUtc).getTimezoneOffset() * 60 * 1000;
+      return msUtc + tzFix;
     }
 
     // 2) ISO u otro formato parseable por Date()
@@ -88,7 +104,7 @@ function timestampToMs(ts) {
       const hh = Number(m[4] || 0);
       const mi = Number(m[5] || 0);
       const ss = Number(m[6] || 0);
-      const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
+      const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss); // local
       if (!isNaN(d2.getTime())) return d2.getTime();
     }
 

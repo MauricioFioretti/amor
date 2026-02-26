@@ -100,25 +100,35 @@ function formatearFecha(ts) {
   // - ISO: "2026-02-01T12:34:56.000Z"
   // - Fecha local: "31/01/2026 10:30" o "31-01-2026 10:30"
   // - Serial de Sheets (número): 45567.5 (días desde 1899-12-30)
+  // Muestra en 24h (sin AM/PM)
   try {
     if (ts === null || ts === undefined) return "";
     const raw = (typeof ts === "string") ? ts.trim() : ts;
 
+    const fmt = {
+      dateStyle: "medium",
+      timeStyle: "short",
+      hour12: false
+    };
+
     // 1) Si viene como número (serial Sheets) o string numérico
-    const n = (typeof raw === "number") ? raw : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+    const n = (typeof raw === "number")
+      ? raw
+      : (typeof raw === "string" && raw !== "" ? Number(raw) : NaN);
+
     if (!Number.isNaN(n) && Number.isFinite(n)) {
-      // Google Sheets serial date: days since 1899-12-30
-      const ms = Math.round((n - 25569) * 86400 * 1000); // 25569 = días entre 1899-12-30 y 1970-01-01
-      const d = new Date(ms);
+      const msUtc = Math.round((n - 25569) * 86400 * 1000);
+      const tzFix = new Date(msUtc).getTimezoneOffset() * 60 * 1000;
+      const d = new Date(msUtc + tzFix);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+        return d.toLocaleString("es-AR", fmt);
       }
     }
 
-    // 2) Intento parse directo (ISO suele funcionar)
+    // 2) ISO u otros formatos que JS entienda
     const d1 = new Date(raw);
     if (!isNaN(d1.getTime())) {
-      return d1.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      return d1.toLocaleString("es-AR", fmt);
     }
 
     // 3) Parse dd/mm/yyyy (o dd-mm-yyyy) con hora opcional
@@ -132,7 +142,7 @@ function formatearFecha(ts) {
       const ss = Number(m[6] || 0);
       const d2 = new Date(yyyy, mm - 1, dd, hh, mi, ss);
       if (!isNaN(d2.getTime())) {
-        return d2.toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+        return d2.toLocaleString("es-AR", fmt);
       }
     }
 
